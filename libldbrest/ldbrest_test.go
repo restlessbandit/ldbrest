@@ -14,6 +14,64 @@ import (
 	"github.com/jmhodges/levigo"
 )
 
+func TestMultiGet(t *testing.T) {
+	dbpath := setup(t)
+	defer cleanup(dbpath)
+
+	k1 := "1"
+	k2 := "2"
+
+	app := newAppTester(t)
+	app.put(k1, k1)
+	app.put(k2, k2)
+
+	expectNItems := 2
+	itemMap := app.multiGet([]string{k1, k2})
+	if len(itemMap) != expectNItems {
+		t.Fatalf("Expected len(itemMap) to be %d, got %d\n", expectNItems, len(itemMap))
+	}
+
+	if itemMap[k1] != k1 {
+		t.Fatalf("Expected itemMap[%s] to be '%s', got '%s'\n", k1, k1, itemMap[k1])
+	}
+
+	if itemMap[k2] != k2 {
+		t.Fatalf("Expected itemMap[%s] to be '%s', got '%s'\n", k2, k2, itemMap[k2])
+	}
+}
+
+func TestMultiGetMissingKey(t *testing.T) {
+	dbpath := setup(t)
+	defer cleanup(dbpath)
+
+	k1 := "1"
+	k2 := "2"
+
+	kMissing := "3"
+
+	app := newAppTester(t)
+	app.put(k1, k1)
+	app.put(k2, k2)
+
+	expectNItems := 2
+	itemMap := app.multiGet([]string{k1, k2, kMissing})
+	if len(itemMap) != expectNItems {
+		t.Fatalf("Expected len(itemMap) to be %d, got %d\n", expectNItems, len(itemMap))
+	}
+
+	if itemMap[k1] != k1 {
+		t.Fatalf("Expected itemMap[%s] to be '%s', got '%s'\n", k1, k1, itemMap[k1])
+	}
+
+	if itemMap[k2] != k2 {
+		t.Fatalf("Expected itemMap[%s] to be '%s', got '%s'\n", k2, k2, itemMap[k2])
+	}
+
+	if val, ok := itemMap[kMissing]; ok {
+		t.Fatalf("Expected itemMap[%s] to not exist, got '%s'\n", kMissing, val)
+	}
+}
+
 func TestKeyPutGet(t *testing.T) {
 	dbpath := setup(t)
 	defer cleanup(dbpath)
@@ -253,9 +311,9 @@ func (app *appTester) maybeGet(key string) (bool, string) {
 	rr := app.doReq("GET", fmt.Sprintf("http://domain/key/%s", key), "")
 
 	switch rr.Code {
-	case 404:
+	case http.StatusNotFound:
 		return false, ""
-	case 200:
+	case http.StatusOK:
 		ct := rr.HeaderMap.Get("Content-Type")
 		if ct != "text/plain" {
 			app.tb.Fatalf("non 'text/plain' 200 GET /key/%s response: %s", key, ct)
@@ -273,6 +331,38 @@ func (app *appTester) get(key string) string {
 		app.tb.Fatalf("failed to find key %s", key)
 	}
 	return value
+}
+
+func (app *appTester) multiGet(keys []string) map[string]string {
+	reqBody := map[string][]string{
+		"Keys": keys,
+	}
+
+	reqJSON, err := json.Marshal(reqBody)
+	if err != nil {
+		app.tb.Fatalf("Error: json.Marshal: %s\n  request body was: %#v\n", err.Error(), reqBody)
+	}
+
+	rr := app.doReq("POST", "http://domain/keys", string(reqJSON))
+
+	if rr.Code == http.StatusOK {
+		ct := rr.HeaderMap.Get("Content-Type")
+		if ct != "application/json" {
+			app.tb.Fatalf("non 'application/json' 200 POST /keys response: %s\n  keys: %v\n", ct, keys)
+		}
+	} else {
+		app.tb.Fatalf("questionable GET /keys, keys: %v, response: %d", keys, rr.Code)
+	}
+
+	respBody := rr.Body.Bytes()
+
+	items := map[string]string{}
+	err = json.Unmarshal(respBody, &items)
+	if err != nil {
+		app.tb.Fatalf("Error: json.Unmarshal: %s\n  keys: %v\n  response body: %s", err.Error(), keys, rr.Body.String())
+	}
+
+	return items
 }
 
 func (app *appTester) del(key string) bool {
