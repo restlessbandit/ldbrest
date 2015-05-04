@@ -96,8 +96,9 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		if err != nil {
 			failErr(w, err)
 			return
+		} else if val != nil {
+			results[key] = string(val)
 		}
-		results[key] = string(val)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
