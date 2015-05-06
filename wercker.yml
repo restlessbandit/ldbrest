@@ -12,17 +12,11 @@ build:
           go get github.com/tools/godep
 
     - script:
-        name: go get
-        code: |
-          godep get ./...
-
-    - script:
         name: go build
         code: |
-          go build ./...
+          godep go build ./...
 
     - script:
         name: go test
         code: |
-          go test ./...
-
+          godep go test ./...
