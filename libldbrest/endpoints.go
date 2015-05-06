@@ -105,9 +105,7 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(struct {
-		Data []*keyval `json:"data"`
-	}{results})
+	json.NewEncoder(w).Encode(multiResponse{nil, results})
 }
 
 // fetch a contiguous range of keys and their values
@@ -137,11 +135,6 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	include_end := q.Get("include_end") == "yes"
 	backwards := q.Get("forward") == "no"
 
-	type wrapper struct {
-		More bool      `json:"more"`
-		Data []*keyval `json:"data"`
-	}
-
 	var (
 		data = make([]*keyval, 0)
 		more bool
@@ -165,7 +158,7 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&wrapper{more, data})
+	json.NewEncoder(w).Encode(&multiResponse{&more, data})
 }
 
 // atomically write a batch of updates
@@ -221,4 +214,9 @@ func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params
 type keyval struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
+}
+
+type multiResponse struct {
+	More *bool     `json:"more,omitempty"`
+	Data []*keyval `json:"data"`
 }
