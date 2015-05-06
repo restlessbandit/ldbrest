@@ -126,23 +126,20 @@ func TestIteration(t *testing.T) {
 	app.put("d", "D")
 
 	/*
-		keys only [b, d)
+		[b, d)
 	*/
-	rr := app.doReq("GET", "http://domain/iterate?start=b&include_start=yes&end=d&include_values=no", "")
+	rr := app.doReq("GET", "http://domain/iterate?start=b&include_start=yes&end=d", "")
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kresp := &struct {
-		More bool
-		Data []string
-	}{}
+	kresp := &multiResponse{}
 	if err := json.NewDecoder(rr.Body).Decode(kresp); err != nil {
 		t.Fatal(err)
 	}
 	assert(t, len(kresp.Data) == 2, "wrong # of returned keys: %d", len(kresp.Data))
-	assert(t, kresp.Data[0] == "b", "wrong returned key: %s", kresp.Data[0])
-	assert(t, kresp.Data[1] == "c", "wrong returned key: %s", kresp.Data[1])
-	assert(t, !kresp.More, "ldbrest falsely reporting 'more'")
+	assert(t, kresp.Data[0].Key == "b", "wrong returned key: %s", kresp.Data[0])
+	assert(t, kresp.Data[1].Key == "c", "wrong returned key: %s", kresp.Data[1])
+	assert(t, !*kresp.More, "ldbrest falsely reporting 'more'")
 
 	/*
 		keys and vals [0, 2)
@@ -192,19 +189,19 @@ func TestIteration(t *testing.T) {
 	/*
 		keys only [d, a] in reverse with max 2 (trigger 'more')
 	*/
-	rr = app.doReq("GET", "http://domain/iterate?start=d&forward=no&max=2&end=a&include_end=yes&include_values=no", "")
+	rr = app.doReq("GET", "http://domain/iterate?start=d&forward=no&max=2&end=a&include_end=yes", "")
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kresp.More = false
+	kresp.More = nil
 	kresp.Data = nil
 	if err := json.NewDecoder(rr.Body).Decode(kresp); err != nil {
 		t.Fatal(err)
 	}
 	assert(t, len(kresp.Data) == 2, "wrong # of keys: %d", len(kresp.Data))
-	assert(t, kresp.More, "'more' should be true (reverse)")
-	assert(t, kresp.Data[0] == "d", "wrong data[0]: %s", kresp.Data[0])
-	assert(t, kresp.Data[1] == "c", "wrong data[1]: %s", kresp.Data[1])
+	assert(t, *kresp.More, "'more' should be true (reverse)")
+	assert(t, kresp.Data[0].Key == "d", "wrong data[0]: %s", kresp.Data[0])
+	assert(t, kresp.Data[1].Key == "c", "wrong data[1]: %s", kresp.Data[1])
 }
 
 func TestBatch(t *testing.T) {
@@ -344,13 +341,18 @@ func (app *appTester) multiGet(keys []string) map[string]string {
 
 	respBody := rr.Body.Bytes()
 
-	items := map[string]string{}
-	err = json.Unmarshal(respBody, &items)
+	items := &multiResponse{}
+	err = json.Unmarshal(respBody, items)
 	if err != nil {
 		app.tb.Fatalf("Error: json.Unmarshal: %s\n  keys: %v\n  response body: %s", err.Error(), keys, rr.Body.String())
 	}
 
-	return items
+	results := map[string]string{}
+	for _, kv := range items.Data {
+		results[kv.Key] = kv.Value
+	}
+
+	return results
 }
 
 func (app *appTester) del(key string) bool {
