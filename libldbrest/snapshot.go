@@ -1,68 +1,59 @@
 package libldbrest
 
-import "github.com/jmhodges/levigo"
+import (
+	"os"
 
-func makeSnap(dest string) error {
-	opts := levigo.NewOptions()
-	defer opts.Close()
-	opts.SetCreateIfMissing(true)
-	opts.SetErrorIfExists(true)
-	to, err := levigo.Open(dest, opts)
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
+)
+
+func makeSnap(destpath string) error {
+	dest, err := leveldb.OpenFile(destpath, nil)
 	if err != nil {
 		return err
 	}
-	defer to.Close()
+	failed := false
+	defer func() {
+		dest.Close()
+		if failed {
+			os.RemoveAll(destpath)
+		}
+	}()
 
-	ss := db.NewSnapshot()
-	sro := levigo.NewReadOptions()
-	defer sro.Close()
-	sro.SetSnapshot(ss)
-	sro.SetFillCache(false)
+	snap, err := db.GetSnapshot()
+	if err != nil {
+		return err
+	}
+	defer snap.Release()
 
-	it := db.NewIterator(sro)
-	defer it.Close()
+	iter := snap.NewIterator(nil, &opt.ReadOptions{
+		DontFillCache: true,
+	})
+	defer iter.Release()
 
-	wb := levigo.NewWriteBatch()
-
+	batch := &leveldb.Batch{}
 	var i uint
-	for it.SeekToFirst(); it.Valid(); it.Next() {
-		wb.Put(it.Key(), it.Value())
+	for iter.First(); iter.Valid(); iter.Next() {
+		batch.Put(iter.Key(), iter.Value())
 		i++
 
 		if i%1000 == 0 {
-			wb, err = dumpBatch(wb, to, true)
+			err = dest.Write(batch, nil)
 			if err != nil {
-				goto fail
+				failed = true
+				return err
 			}
+			batch.Reset()
 		}
 	}
 
 	if i%1000 != 0 {
-		_, err = dumpBatch(wb, to, false)
+		err = dest.Write(batch, nil)
 		if err != nil {
-			goto fail
+			failed = true
+			return err
 		}
-	} else {
-		wb.Close()
 	}
 
 	return nil
-
-fail:
-	levigo.DestroyDatabase(dest, opts)
-	return err
-}
-
-func dumpBatch(wb *levigo.WriteBatch, dest *levigo.DB, more bool) (*levigo.WriteBatch, error) {
-	defer wb.Close()
-
-	err := dest.Write(wo, wb)
-	if err != nil {
-		return nil, err
-	}
-
-	if more {
-		return levigo.NewWriteBatch(), nil
-	}
-	return nil, nil
 }

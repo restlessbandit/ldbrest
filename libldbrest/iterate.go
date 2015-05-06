@@ -2,53 +2,54 @@ package libldbrest
 
 import (
 	"bytes"
-	"github.com/jmhodges/levigo"
+
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 func iterate(start []byte, include_start, backwards bool, handle func([]byte, []byte) (bool, error)) error {
-	ropts := levigo.NewReadOptions()
-	defer ropts.Close()
-	ropts.SetFillCache(false)
-
-	it := db.NewIterator(ropts)
-	defer it.Close()
+	iter := db.NewIterator(
+		nil,
+		&opt.ReadOptions{
+			DontFillCache: true,
+		},
+	)
 
 	if bytes.Equal(start, []byte{}) {
 		if backwards {
-			it.SeekToLast()
+			iter.Last()
 		} else {
-			it.SeekToFirst()
+			iter.First()
 		}
 	} else {
-		it.Seek(start)
+		iter.Seek(start)
 	}
 
-	var proceed func()
+	var proceed func() bool
 
 	if backwards {
-		proceed = it.Prev
+		proceed = iter.Prev
 
-		// levigo *Iterator.Seek() seeks to the first key >= its argument, but
-		// going backwards we need the last key <= the arg, so adjust accordingly
-		if !it.Valid() {
-			it.SeekToLast()
-		} else if !include_start && !bytes.Equal(it.Key(), start) {
-			it.Prev()
+		// Iterator.Seek() seeks to the first key >= its argument, but going
+		// backwards we need the last key <= the arg, so adjust accordingly
+		if !iter.Valid() {
+			iter.Last()
+		} else if !include_start && !bytes.Equal(iter.Key(), start) {
+			iter.Prev()
 		}
 	} else {
-		proceed = it.Next
+		proceed = iter.Next
 	}
 
 	first := true
 
-	for ; it.Valid(); proceed() {
-		if first && !include_start && bytes.Equal(it.Key(), start) {
+	for ; iter.Valid(); proceed() {
+		if first && !include_start && bytes.Equal(iter.Key(), start) {
 			first = false
 			continue
 		}
 		first = false
 
-		stop, err := handle(it.Key(), it.Value())
+		stop, err := handle(iter.Key(), iter.Value())
 		if err != nil {
 			return err
 		}

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 const (
@@ -42,11 +43,11 @@ func InitRouter(prefix string) *httprouter.Router {
 
 // retrieve single keys
 func getItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	b, err := db.Get(ro, []byte(p.ByName("name")[1:]))
-	if err != nil {
-		failErr(w, err)
-	} else if b == nil {
+	b, err := db.Get([]byte(p.ByName("name")[1:]), nil)
+	if err == leveldb.ErrNotFound {
 		failCode(w, http.StatusNotFound)
+	} else if err != nil {
+		failErr(w, err)
 	} else {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write(b)
@@ -61,7 +62,7 @@ func setItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 
-	err := db.Put(wo, []byte(p.ByName("name")[1:]), buf.Bytes())
+	err := db.Put([]byte(p.ByName("name")[1:]), buf.Bytes(), nil)
 	if err != nil {
 		failErr(w, err)
 	} else {
@@ -71,7 +72,7 @@ func setItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 // delete a key by name
 func deleteItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	err := db.Delete(wo, []byte(p.ByName("name")[1:]))
+	err := db.Delete([]byte(p.ByName("name")[1:]), nil)
 	if err != nil {
 		failErr(w, err)
 	} else {
@@ -92,11 +93,13 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 
 	results := make(map[string]string, len(req.Keys))
 	for _, key := range req.Keys {
-		val, err := db.Get(ro, []byte(key))
-		if err != nil {
+		val, err := db.Get([]byte(key), nil)
+		if err == leveldb.ErrNotFound {
+			continue
+		} else if err != nil {
 			failErr(w, err)
 			return
-		} else if val != nil {
+		} else {
 			results[key] = string(val)
 		}
 	}
@@ -198,7 +201,7 @@ func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 
 // get a leveldb property
 func getLDBProperty(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	prop := db.PropertyValue(p.ByName("name"))
+	prop, _ := db.GetProperty(p.ByName("name"))
 	if prop == "" {
 		failCode(w, http.StatusNotFound)
 	} else {

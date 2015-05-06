@@ -11,7 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jmhodges/levigo"
+	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/syndtr/goleveldb/leveldb/opt"
 )
 
 func TestMultiGet(t *testing.T) {
@@ -236,20 +237,13 @@ func setup(tb testing.TB) string {
 		tb.Fatal(err)
 	}
 
-	opts := levigo.NewOptions()
-	defer opts.Close()
-
-	opts.SetCreateIfMissing(true)
-	opts.SetErrorIfExists(true)
-
-	db, err = levigo.Open(dirpath, opts)
+	db, err = leveldb.OpenFile(dirpath, &opt.Options{
+		ErrorIfExist: true,
+	})
 	if err != nil {
 		os.RemoveAll(dirpath)
 		tb.Fatal(err)
 	}
-
-	ro = levigo.NewReadOptions()
-	wo = levigo.NewWriteOptions()
 
 	return dirpath
 }
@@ -257,12 +251,6 @@ func setup(tb testing.TB) string {
 func cleanup(path string) {
 	if db != nil {
 		db.Close()
-	}
-	if ro != nil {
-		ro.Close()
-	}
-	if wo != nil {
-		wo.Close()
 	}
 	os.RemoveAll(path)
 }

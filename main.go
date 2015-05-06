@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	lib "github.com/teepark/ldbrest/libldbrest"
+	lib "github.com/restlessbandit/ldbrest/libldbrest"
 )
 
 // addrlist to support the flag.Value interface
