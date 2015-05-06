@@ -91,7 +91,7 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 
-	results := make(map[string]string, len(req.Keys))
+	results := make([]*keyval, 0, len(req.Keys))
 	for _, key := range req.Keys {
 		val, err := db.Get([]byte(key), nil)
 		if err == leveldb.ErrNotFound {
@@ -100,12 +100,14 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 			failErr(w, err)
 			return
 		} else {
-			results[key] = string(val)
+			results = append(results, &keyval{key, string(val)})
 		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(results)
+	json.NewEncoder(w).Encode(struct {
+		Data []*keyval `json:"data"`
+	}{results})
 }
 
 // fetch a contiguous range of keys and their values
@@ -129,39 +131,26 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		max = ABSMAX
 	}
 
-	// by default we traverse forwards,
-	// include "start" but not "end" (like go slicing),
-	// and include values in the response data
+	// by default we traverse forwards and
+	// include "start" but not "end" (like go slicing)
 	ignore_start := q.Get("include_start") == "no"
 	include_end := q.Get("include_end") == "yes"
 	backwards := q.Get("forward") == "no"
-	skip_values := q.Get("include_values") == "no"
 
-	type keyval struct {
-		Key   string `json:"key"`
-		Value string `json:"value"`
-	}
 	type wrapper struct {
-		More bool          `json:"more"`
-		Data []interface{} `json:"data"` // either keyvals or just string keys
+		More bool      `json:"more"`
+		Data []*keyval `json:"data"`
 	}
 
 	var (
-		data = make([]interface{}, 0)
+		data = make([]*keyval, 0)
 		more bool
 	)
 
 	var once func([]byte, []byte) error
-	if skip_values {
-		once = func(key, value []byte) error {
-			data = append(data, string(key))
-			return nil
-		}
-	} else {
-		once = func(key, value []byte) error {
-			data = append(data, &keyval{string(key), string(value)})
-			return nil
-		}
+	once = func(key, value []byte) error {
+		data = append(data, &keyval{string(key), string(value)})
+		return nil
 	}
 
 	if end == "" {
@@ -226,4 +215,9 @@ func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params
 	} else {
 		w.WriteHeader(http.StatusNoContent)
 	}
+}
+
+type keyval struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }

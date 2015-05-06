@@ -29,9 +29,11 @@ Deletes the key <name> and returns a 204.
   POST /keys
 Retrieves all of a group of keys in one endpoint. It takes a JSON request body
 with a single key "keys", which should be an array of the string keys to
-retrieve. The response is application/json with top-level key/value pairs of
-the keys it was told to retrieve and their corresponding values (or null if
-they weren't found).
+retrieve.
+
+The response is application/json with a single key "data", an array of objects
+with "key" and "value" keys. Any keys from the request that were not found in
+the database are simply omitted from the response.
 
 This endpoint doesn't actually change any server-side data, but the POST is
 necessary to ensure that a request body makes it through.
@@ -57,13 +59,10 @@ exists (default "no")
 in conjunction with "end" in which case either condition would terminate
 iteration (default 1000, higher values than this will be ignored)
 
-* "include_values" is whether to produce {"key": "<key>", "value": "<value>"}
-objects or just "<key>" strings (default "yes")
-
 It then returns a JSON object with two keys "more" and "data". "data" is an
-array of either objects or strings depending on "include_values", while "more"
-is false unless "end" was provided but "max" caused the end of iteration (there
-was still more to go before we would have hit "end").
+array of objects, while "more" is false unless "end" was provided but "max"
+caused the end of iteration (there was still more to go before we would have
+hit "end").
 
   POST /batch
 Applies a batch of updates atomically. It accepts a JSON request body with key
