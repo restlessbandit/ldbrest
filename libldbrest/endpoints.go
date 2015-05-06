@@ -99,7 +99,7 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		} else if err != nil {
 			failErr(w, err)
 			return
-		} else {
+		} else if val != nil {
 			results = append(results, &keyval{key, string(val)})
 		}
 	}
