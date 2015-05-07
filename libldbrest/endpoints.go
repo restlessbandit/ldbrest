@@ -107,7 +107,7 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 
 	w.Header().Set("Content-Type", "application/msgpack")
-	codec.NewEncoder(w, msgpack).Encode(multiResponse{nil, results})
+	codec.NewEncoder(w, msgpack).Encode(multiResponse{results})
 }
 
 // fetch a contiguous range of keys and their values
@@ -160,12 +160,14 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/msgpack")
-	codec.NewEncoder(w, msgpack).Encode(&multiResponse{&more, data})
+	codec.NewEncoder(w, msgpack).Encode(&multiResponseMore{&more, data})
 }
 
 // atomically write a batch of updates
 func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	req := &struct{ Ops oplist }{}
+	req := &struct {
+		Ops oplist `json:"ops"`
+	}{}
 
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
@@ -220,7 +222,11 @@ type keyval struct {
 	Value string `json:"value"`
 }
 
+type multiResponseMore struct {
+	More *bool     `json:"more"`
+	Data []*keyval `json:"data"`
+}
+
 type multiResponse struct {
-	More *bool     `json:"more,omitempty"`
 	Data []*keyval `json:"data"`
 }

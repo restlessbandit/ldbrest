@@ -2,11 +2,14 @@ package libldbrest
 
 import (
 	"errors"
+
 	"github.com/syndtr/goleveldb/leveldb"
 )
 
 type oplist []*struct {
-	Op, Key, Value string
+	Op    string `json:"op"`
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
 var errBadBatch = errors.New("bad write batch")

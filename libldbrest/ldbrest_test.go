@@ -1,7 +1,6 @@
 package libldbrest
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/opt"
+	"github.com/ugorji/go/codec"
 )
 
 func TestMultiGet(t *testing.T) {
@@ -132,8 +132,8 @@ func TestIteration(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kresp := &multiResponse{}
-	if err := json.NewDecoder(rr.Body).Decode(kresp); err != nil {
+	kresp := &multiResponseMore{}
+	if err := codec.NewDecoder(rr.Body, msgpack).Decode(kresp); err != nil {
 		t.Fatal(err)
 	}
 	assert(t, len(kresp.Data) == 2, "wrong # of returned keys: %d", len(kresp.Data))
@@ -148,14 +148,8 @@ func TestIteration(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kvresp := &struct {
-		More bool
-		Data []*struct {
-			Key   string
-			Value string
-		}
-	}{}
-	if err := json.NewDecoder(rr.Body).Decode(kvresp); err != nil {
+	kvresp := &multiResponseMore{}
+	if err := codec.NewDecoder(rr.Body, msgpack).Decode(kvresp); err != nil {
 		t.Fatal(err)
 	}
 	assert(t, len(kvresp.Data) == 2, "wrong # of keyvals: %d", len(kvresp.Data))
@@ -163,7 +157,7 @@ func TestIteration(t *testing.T) {
 	assert(t, kvresp.Data[0].Value == "A", "wrong first value: %s", kvresp.Data[0].Value)
 	assert(t, kvresp.Data[1].Key == "b", "wrong second key: %s", kvresp.Data[1].Key)
 	assert(t, kvresp.Data[1].Value == "B", "wrong second value: %s", kvresp.Data[1].Value)
-	assert(t, !kvresp.More, "ldbrest falsely reporting 'more'")
+	assert(t, !*kvresp.More, "ldbrest falsely reporting 'more'")
 
 	/*
 		keys and vals [a, d] with max 3 (trigger 'more')
@@ -172,13 +166,13 @@ func TestIteration(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kvresp.More = false
+	*kvresp.More = false
 	kvresp.Data = nil
-	if err := json.NewDecoder(rr.Body).Decode(kvresp); err != nil {
+	if err := codec.NewDecoder(rr.Body, msgpack).Decode(kvresp); err != nil {
 		t.Fatal(err)
 	}
 	assert(t, len(kvresp.Data) == 3, "wrong # of keyvals: %d", len(kvresp.Data))
-	assert(t, kvresp.More, "'more' should be true")
+	assert(t, *kvresp.More, "'more' should be true")
 	assert(t, kvresp.Data[0].Key == "a", "wrong data[0].Key: %s", kvresp.Data[0].Key)
 	assert(t, kvresp.Data[1].Key == "b", "wrong data[1].Key: %s", kvresp.Data[1].Key)
 	assert(t, kvresp.Data[2].Key == "c", "wrong data[2].Key: %s", kvresp.Data[2].Key)
@@ -195,7 +189,7 @@ func TestIteration(t *testing.T) {
 	}
 	kresp.More = nil
 	kresp.Data = nil
-	if err := json.NewDecoder(rr.Body).Decode(kresp); err != nil {
+	if err := codec.NewDecoder(rr.Body, msgpack).Decode(kresp); err != nil {
 		t.Fatal(err)
 	}
 	assert(t, len(kresp.Data) == 2, "wrong # of keys: %d", len(kresp.Data))
@@ -323,28 +317,27 @@ func (app *appTester) multiGet(keys []string) map[string]string {
 		"Keys": keys,
 	}
 
-	reqJSON, err := json.Marshal(reqBody)
+	bytesOut := make([]byte, 0)
+	err := codec.NewEncoderBytes(&bytesOut, msgpack).Encode(reqBody)
 	if err != nil {
-		app.tb.Fatalf("Error: json.Marshal: %s\n  request body was: %#v\n", err.Error(), reqBody)
+		app.tb.Fatalf("Error: msgpack marshal: %s\n  request body was: %#v\n", err.Error(), reqBody)
 	}
 
-	rr := app.doReq("POST", "http://domain/keys", string(reqJSON))
+	rr := app.doReq("POST", "http://domain/keys", string(bytesOut))
 
 	if rr.Code == http.StatusOK {
 		ct := rr.HeaderMap.Get("Content-Type")
-		if ct != "application/json" {
-			app.tb.Fatalf("non 'application/json' 200 POST /keys response: %s\n  keys: %v\n", ct, keys)
+		if ct != "application/msgpack" {
+			app.tb.Fatalf("non 'application/msgpack' 200 POST /keys response: %s\n  keys: %v\n", ct, keys)
 		}
 	} else {
 		app.tb.Fatalf("questionable GET /keys, keys: %v, response: %d", keys, rr.Code)
 	}
 
-	respBody := rr.Body.Bytes()
-
 	items := &multiResponse{}
-	err = json.Unmarshal(respBody, items)
+	err = codec.NewDecoderBytes(rr.Body.Bytes(), msgpack).Decode(items)
 	if err != nil {
-		app.tb.Fatalf("Error: json.Unmarshal: %s\n  keys: %v\n  response body: %s", err.Error(), keys, rr.Body.String())
+		app.tb.Fatalf("Error: msgpack unmarshal: %s\n  keys: %v\n  response body: %s", err.Error(), keys, rr.Body.String())
 	}
 
 	results := map[string]string{}
@@ -361,13 +354,15 @@ func (app *appTester) del(key string) bool {
 }
 
 func (app *appTester) batch(ops oplist) bool {
-	body, err := json.Marshal(struct {
+	bytesOut := make([]byte, 0)
+
+	err := codec.NewEncoderBytes(&bytesOut, msgpack).Encode(struct {
 		Ops oplist `json:"ops"`
 	}{ops})
 	if err != nil {
 		app.tb.Fatalf("json ops Marshal: %v", err)
 	}
 
-	rr := app.doReq("POST", "http://domain/batch", string(body))
+	rr := app.doReq("POST", "http://domain/batch", string(bytesOut))
 	return rr.Code == 204
 }
