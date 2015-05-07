@@ -8,7 +8,7 @@
 		},
 		{
 			"ImportPath": "github.com/syndtr/goleveldb/leveldb",
-			"Rev": "4875955338b0a434238a31165cb87255ab6e9e4a"
+			"Rev": "012f65f74744ed62a80abac6e9a8c86e71c2b6fa"
 		},
 		{
 			"ImportPath": "github.com/syndtr/gosnappy/snappy",
