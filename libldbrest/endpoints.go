@@ -183,10 +183,12 @@ func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 
 // get a leveldb property
 func getLDBProperty(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	prop, err := db.GetProperty(p.ByName("name"))
-	// TODO: differentiate between "property doesn't exist"
-	if err != nil {
+	name := p.ByName("name")
+	prop, err := db.GetProperty(name)
+	if err == leveldb.ErrNotFound {
 		failCode(w, http.StatusNotFound)
+	} else if err != nil {
+		failErr(w, err)
 	} else {
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte(prop))
