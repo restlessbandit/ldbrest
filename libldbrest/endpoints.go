@@ -2,18 +2,20 @@ package libldbrest
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/ugorji/go/codec"
 )
 
 const (
 	ABSMAX = 1000
 )
+
+var msgpack = &codec.MsgpackHandle{}
 
 // InitRouter creates an *httprouter.Router and sets the endpoints to run the
 // ldbrest server
@@ -85,7 +87,7 @@ func deleteItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct{ Keys []string }{}
 
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
 		failErr(w, err)
 		return
@@ -104,8 +106,8 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(multiResponse{nil, results})
+	w.Header().Set("Content-Type", "application/msgpack")
+	codec.NewEncoder(w, msgpack).Encode(multiResponse{nil, results})
 }
 
 // fetch a contiguous range of keys and their values
@@ -157,15 +159,15 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		failErr(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&multiResponse{&more, data})
+	w.Header().Set("Content-Type", "application/msgpack")
+	codec.NewEncoder(w, msgpack).Encode(&multiResponse{&more, data})
 }
 
 // atomically write a batch of updates
 func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct{ Ops oplist }{}
 
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
 		failErr(w, err)
 		return
@@ -200,7 +202,7 @@ func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params
 	req := &struct {
 		Destination string
 	}{}
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
 		failErr(w, err)
 		return
