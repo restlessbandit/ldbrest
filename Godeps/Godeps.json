@@ -19,7 +19,7 @@
 		},
 		{
 			"ImportPath": "github.com/ugorji/go/codec",
-			"Rev": "3bf34b310f3f1eef0e3981ddf6f6c79e2b907b02"
+			"Rev": "66dd47f2e86ef2197b1efe113185bed93ebd5e28"
 		}
 	]
 }
