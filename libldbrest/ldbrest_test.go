@@ -363,7 +363,7 @@ func (app *appTester) batch(ops oplist) bool {
 	bytesOut := make([]byte, 0)
 
 	err := codec.NewEncoderBytes(&bytesOut, msgpack).Encode(struct {
-		Ops oplist `json:"ops" codec:"ops"`
+		Ops oplist `codec:"ops"`
 	}{ops})
 	if err != nil {
 		app.tb.Fatalf("json ops Marshal: %v", err)

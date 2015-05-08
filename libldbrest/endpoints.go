@@ -88,7 +88,7 @@ func deleteItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // (must be a POST to accept a request body, but we aren't changing server-side data)
 func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct {
-		Keys []string `json:"keys" codec:"keys"`
+		Keys []string `codec:"keys"`
 	}{}
 
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
@@ -170,7 +170,7 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // atomically write a batch of updates
 func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct {
-		Ops oplist `json:"ops" codec:"ops"`
+		Ops oplist `codec:"ops"`
 	}{}
 
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
@@ -206,7 +206,7 @@ func getLDBProperty(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 // copy the whole db via a point-in-time snapshot
 func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct {
-		Destination string `json:"destination" codec:"destination"`
+		Destination string `codec:"destination"`
 	}{}
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
@@ -222,11 +222,11 @@ func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params
 }
 
 type keyval struct {
-	Key   string `json:"key" codec:"key"`
-	Value string `json:"value" codec:"value"`
+	Key   string `codec:"key"`
+	Value string `codec:"value"`
 }
 
 type multiResponse struct {
-	More *bool     `json:"more,omitempty" codec:"more,omitempty"`
-	Data []*keyval `json:"data" codec:"data"`
+	More *bool     `codec:"more,omitempty"`
+	Data []*keyval `codec:"data"`
 }
