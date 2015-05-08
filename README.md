@@ -1,5 +1,5 @@
 
-[godoc](http://godoc.org/github.com/teepark/ldbrest)
+http://godoc.org/github.com/teepark/ldbrest
 
 
 #### Installing
