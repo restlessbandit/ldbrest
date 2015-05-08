@@ -1,6 +1,9 @@
 {
 	"ImportPath": "github.com/restlessbandit/ldbrest",
 	"GoVersion": "go1.4.2",
+	"Packages": [
+		"./..."
+	],
 	"Deps": [
 		{
 			"ImportPath": "github.com/julienschmidt/httprouter",
@@ -13,6 +16,10 @@
 		{
 			"ImportPath": "github.com/syndtr/gosnappy/snappy",
 			"Rev": "156a073208e131d7d2e212cb749feae7c339e846"
+		},
+		{
+			"ImportPath": "github.com/ugorji/go/codec",
+			"Rev": "66dd47f2e86ef2197b1efe113185bed93ebd5e28"
 		}
 	]
 }

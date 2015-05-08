@@ -2,18 +2,21 @@ package libldbrest
 
 import (
 	"bytes"
-	"encoding/json"
 	"io"
 	"net/http"
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/syndtr/goleveldb/leveldb"
+	"github.com/ugorji/go/codec"
 )
 
 const (
-	ABSMAX = 1000
+	ABSMAX       = 1000
+	msgpackCType = "application/msgpack"
 )
+
+var msgpack = &codec.MsgpackHandle{}
 
 // InitRouter creates an *httprouter.Router and sets the endpoints to run the
 // ldbrest server
@@ -43,14 +46,15 @@ func InitRouter(prefix string) *httprouter.Router {
 
 // retrieve single keys
 func getItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	b, err := db.Get([]byte(p.ByName("name")[1:]), nil)
+	key := p.ByName("name")[1:]
+	val, err := db.Get([]byte(key), nil)
 	if err == leveldb.ErrNotFound {
 		failCode(w, http.StatusNotFound)
 	} else if err != nil {
 		failErr(w, err)
 	} else {
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write(b)
+		w.Header().Set("Content-Type", msgpackCType)
+		codec.NewEncoder(w, msgpack).Encode(keyval{key, string(val)})
 	}
 }
 
@@ -83,9 +87,11 @@ func deleteItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // retrieve a given set of keys
 // (must be a POST to accept a request body, but we aren't changing server-side data)
 func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	req := &struct{ Keys []string }{}
+	req := &struct {
+		Keys []string `json:"keys" codec:"keys"`
+	}{}
 
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
 		failErr(w, err)
 		return
@@ -104,8 +110,8 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(multiResponse{nil, results})
+	w.Header().Set("Content-Type", msgpackCType)
+	codec.NewEncoder(w, msgpack).Encode(multiResponse{nil, results})
 }
 
 // fetch a contiguous range of keys and their values
@@ -157,15 +163,17 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		failErr(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(&multiResponse{&more, data})
+	w.Header().Set("Content-Type", msgpackCType)
+	codec.NewEncoder(w, msgpack).Encode(&multiResponse{&more, data})
 }
 
 // atomically write a batch of updates
 func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	req := &struct{ Ops oplist }{}
+	req := &struct {
+		Ops oplist `json:"ops" codec:"ops"`
+	}{}
 
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
 		failErr(w, err)
 		return
@@ -198,9 +206,9 @@ func getLDBProperty(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 // copy the whole db via a point-in-time snapshot
 func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct {
-		Destination string
+		Destination string `json:"destination" codec:"destination"`
 	}{}
-	err := json.NewDecoder(r.Body).Decode(req)
+	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
 		failErr(w, err)
 		return
@@ -214,11 +222,11 @@ func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params
 }
 
 type keyval struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   string `json:"key" codec:"key"`
+	Value string `json:"value" codec:"value"`
 }
 
 type multiResponse struct {
-	More *bool     `json:"more,omitempty"`
-	Data []*keyval `json:"data"`
+	More *bool     `json:"more,omitempty" codec:"more,omitempty"`
+	Data []*keyval `json:"data" codec:"data"`
 }
