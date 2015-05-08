@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"strings"
-	"sync"
 
 	lib "github.com/restlessbandit/ldbrest/libldbrest"
 )
@@ -35,34 +34,21 @@ func main() {
 	}
 	path := flag.Args()[0]
 
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		lib.OpenDB(path)
-		wg.Done()
-	}()
-	defer lib.CleanupDB()
-
-	router := lib.InitRouter("")
-	run(unavailUntilReady(router, wg))
-}
-
-func unavailUntilReady(h http.Handler, wg *sync.WaitGroup) http.Handler {
-	type maybeHandles struct{ http.Handler }
-
-	notReady := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	unavailable := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 		http.Error(w, "not finished initing DB", http.StatusServiceUnavailable)
 	})
 
-	mh := &maybeHandles{notReady}
-	go func() {
-		wg.Wait()
-		mh.Handler = h
-	}()
+	container := &lib.SwappableHandler{}
+	container.Store(unavailable)
 
-	return mh
+	go func() {
+		lib.OpenDB(path)
+		container.Store(lib.InitRouter(""))
+	}()
+	defer lib.CleanupDB()
+
+	run(container)
 }
 
 func parseFlags() {
