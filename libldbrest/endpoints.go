@@ -87,7 +87,9 @@ func deleteItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 // retrieve a given set of keys
 // (must be a POST to accept a request body, but we aren't changing server-side data)
 func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	req := &struct{ Keys []string }{}
+	req := &struct {
+		Keys []string `json:"keys" codec:"keys"`
+	}{}
 
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
@@ -109,7 +111,7 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 
 	w.Header().Set("Content-Type", msgpackCType)
-	codec.NewEncoder(w, msgpack).Encode(multiResponse{results})
+	codec.NewEncoder(w, msgpack).Encode(multiResponse{nil, results})
 }
 
 // fetch a contiguous range of keys and their values
@@ -162,13 +164,13 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		return
 	}
 	w.Header().Set("Content-Type", msgpackCType)
-	codec.NewEncoder(w, msgpack).Encode(&multiResponseMore{&more, data})
+	codec.NewEncoder(w, msgpack).Encode(&multiResponse{&more, data})
 }
 
 // atomically write a batch of updates
 func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct {
-		Ops oplist `json:"ops"`
+		Ops oplist `json:"ops" codec:"ops"`
 	}{}
 
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
@@ -204,7 +206,7 @@ func getLDBProperty(w http.ResponseWriter, r *http.Request, p httprouter.Params)
 // copy the whole db via a point-in-time snapshot
 func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	req := &struct {
-		Destination string
+		Destination string `json:"destination" codec:"destination"`
 	}{}
 	err := codec.NewDecoder(r.Body, msgpack).Decode(req)
 	if err != nil {
@@ -220,15 +222,11 @@ func makeLDBSnapshot(w http.ResponseWriter, r *http.Request, p httprouter.Params
 }
 
 type keyval struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-type multiResponseMore struct {
-	More *bool     `json:"more"`
-	Data []*keyval `json:"data"`
+	Key   string `json:"key" codec:"key"`
+	Value string `json:"value" codec:"value"`
 }
 
 type multiResponse struct {
-	Data []*keyval `json:"data"`
+	More *bool     `json:"more,omitempty" codec:"more,omitempty"`
+	Data []*keyval `json:"data" codec:"data"`
 }

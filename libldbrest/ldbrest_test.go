@@ -132,7 +132,7 @@ func TestIteration(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kresp := &multiResponseMore{}
+	kresp := &multiResponse{}
 	if err := codec.NewDecoder(rr.Body, msgpack).Decode(kresp); err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func TestIteration(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("bad GET /iterate response: %d", rr.Code)
 	}
-	kvresp := &multiResponseMore{}
+	kvresp := &multiResponse{}
 	if err := codec.NewDecoder(rr.Body, msgpack).Decode(kvresp); err != nil {
 		t.Fatal(err)
 	}
@@ -320,7 +320,7 @@ func (app *appTester) get(key string) string {
 
 func (app *appTester) multiGet(keys []string) map[string]string {
 	reqBody := map[string][]string{
-		"Keys": keys,
+		"keys": keys,
 	}
 
 	bytesOut := make([]byte, 0)
@@ -363,7 +363,7 @@ func (app *appTester) batch(ops oplist) bool {
 	bytesOut := make([]byte, 0)
 
 	err := codec.NewEncoderBytes(&bytesOut, msgpack).Encode(struct {
-		Ops oplist `json:"ops"`
+		Ops oplist `json:"ops" codec:"ops"`
 	}{ops})
 	if err != nil {
 		app.tb.Fatalf("json ops Marshal: %v", err)

@@ -7,9 +7,9 @@ import (
 )
 
 type oplist []*struct {
-	Op    string `json:"op"`
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Op    string `json:"op" codec:"op"`
+	Key   string `json:"key" codec:"key"`
+	Value string `json:"value" codec:"value"`
 }
 
 var errBadBatch = errors.New("bad write batch")
