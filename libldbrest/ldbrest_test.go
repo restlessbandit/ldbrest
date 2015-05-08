@@ -294,14 +294,20 @@ func (app *appTester) maybeGet(key string) (bool, string) {
 		return false, ""
 	case http.StatusOK:
 		ct := rr.HeaderMap.Get("Content-Type")
-		if ct != "text/plain" {
-			app.tb.Fatalf("non 'text/plain' 200 GET /key/%s response: %s", key, ct)
+		if ct != msgpackCType {
+			app.tb.Fatalf("non 'application/msgpack' 200 GET /key/%s response: %s", key, ct)
 		}
 	default:
 		app.tb.Fatalf("questionable GET /key/%s response: %d", key, rr.Code)
 	}
 
-	return true, rr.Body.String()
+	req := &keyval{}
+	err := codec.NewDecoder(rr.Body, msgpack).Decode(req)
+	if err != nil {
+		app.tb.Fatalf("bad msgpack GET /key/%s", key)
+	}
+
+	return true, req.Value
 }
 
 func (app *appTester) get(key string) string {

@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	ABSMAX = 1000
+	ABSMAX       = 1000
+	msgpackCType = "application/msgpack"
 )
 
 var msgpack = &codec.MsgpackHandle{}
@@ -45,14 +46,15 @@ func InitRouter(prefix string) *httprouter.Router {
 
 // retrieve single keys
 func getItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	b, err := db.Get([]byte(p.ByName("name")[1:]), nil)
+	key := p.ByName("name")[1:]
+	val, err := db.Get([]byte(key), nil)
 	if err == leveldb.ErrNotFound {
 		failCode(w, http.StatusNotFound)
 	} else if err != nil {
 		failErr(w, err)
 	} else {
-		w.Header().Set("Content-Type", "text/plain")
-		w.Write(b)
+		w.Header().Set("Content-Type", msgpackCType)
+		codec.NewEncoder(w, msgpack).Encode(keyval{key, string(val)})
 	}
 }
 
@@ -106,7 +108,7 @@ func getItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		}
 	}
 
-	w.Header().Set("Content-Type", "application/msgpack")
+	w.Header().Set("Content-Type", msgpackCType)
 	codec.NewEncoder(w, msgpack).Encode(multiResponse{results})
 }
 
@@ -159,7 +161,7 @@ func iterItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		failErr(w, err)
 		return
 	}
-	w.Header().Set("Content-Type", "application/msgpack")
+	w.Header().Set("Content-Type", msgpackCType)
 	codec.NewEncoder(w, msgpack).Encode(&multiResponseMore{&more, data})
 }
 
