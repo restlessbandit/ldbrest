@@ -8,7 +8,7 @@ http://godoc.org/github.com/teepark/ldbrest
 go get github.com/restlessbandit/ldbrest
 go get github.com/tools/godep
 cd $GOPATH/src/github.com/restlessbandit/ldbrest
-godep install .
+godep go install .
 ```
 
 #### Starting
