@@ -280,7 +280,12 @@ func (app *appTester) doReq(method, url, body string) *httptest.ResponseRecorder
 }
 
 func (app *appTester) put(key, value string) {
-	rr := app.doReq("PUT", fmt.Sprintf("http://domain/key/%s", key), value)
+	b := make([]byte, 0)
+	err := codec.NewEncoderBytes(&b, msgpack).Encode(keyval{key, value})
+	if err != nil {
+		app.tb.Fatalf("failed msgpack encode")
+	}
+	rr := app.doReq("POST", "http://domain/key", string(b))
 	if rr.Code != 204 {
 		app.tb.Fatalf("non-204 PUT /key/X response: %d", rr.Code)
 	}
