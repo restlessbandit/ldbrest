@@ -19,21 +19,21 @@ The server offers these endpoints:
 Returns the value associated with the <name> key in the response body with
 content-type text/plain (or 404s).
 
-  PUT /key/<name>
-Takes the (unparsed) request body and stores it as the value under key <name>
-and returns a 204.
+  POST /key
+Takes a msgpack object with "key" and "value" keys and stores them in the
+database, then returns a 204.
 
   DELETE /key/<name>
 Deletes the key <name> and returns a 204.
 
   POST /keys
-Retrieves all of a group of keys in one endpoint. It takes a JSON request body
-with a single key "keys", which should be an array of the string keys to
+Retrieves all of a group of keys in one endpoint. It takes a msgpack request
+body with a single key "keys", which should be an array of the string keys to
 retrieve.
 
-The response is application/json with a single key "data", an array of objects
-with "key" and "value" keys. Any keys from the request that were not found in
-the database are simply omitted from the response.
+The response is application/msgpack with a single key "data", an array of
+objects with "key" and "value" keys. Any keys from the request that were not
+found in the database are simply omitted from the response.
 
 This endpoint doesn't actually change any server-side data, but the POST is
 necessary to ensure that a request body makes it through.
@@ -59,14 +59,14 @@ exists (default "no")
 in conjunction with "end" in which case either condition would terminate
 iteration (default 1000, higher values than this will be ignored)
 
-It then returns a JSON object with two keys "more" and "data". "data" is an
+It then returns a msgpack object with two keys "more" and "data". "data" is an
 array of objects, while "more" is false unless "end" was provided but "max"
 caused the end of iteration (there was still more to go before we would have
 hit "end").
 
   POST /batch
-Applies a batch of updates atomically. It accepts a JSON request body with key
-"ops", an array of objects with keys "op", "key", and "value". "op" may be
+Applies a batch of updates atomically. It accepts a msgpack request body with
+key "ops", an array of objects with keys "op", "key", and "value". "op" may be
 "put" or "delete", in the latter case "value" may be omitted.
 
   GET /property/<name>
@@ -74,9 +74,9 @@ Gets and returns the leveldb property in the text/plain 200 response body, or
 404s if it isn't a valid property name.
 
   POST /snapshot
-Needs a JSON request body with key "destination", which should be a file system
-path. ldbrest will make a complete copy of the database at that location, then
-return a 204 (after what might be a while).
+Needs a msgpack request body with key "destination", which should be a file
+system path. ldbrest will make a complete copy of the database at that
+location, then return a 204 (after what might be a while).
 
 [1] https://github.com/google/leveldb
 */
