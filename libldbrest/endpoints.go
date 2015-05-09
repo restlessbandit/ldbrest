@@ -31,7 +31,7 @@ func InitRouter(prefix string) *httprouter.Router {
 	}
 
 	router.GET(prefix+"/key/*name", getItem)
-	router.PUT(prefix+"/key/*name", setItem)
+	router.POST(prefix+"/key", setItem)
 	router.DELETE(prefix+"/key/*name", deleteItem)
 
 	router.POST(prefix+"/keys", getItems)
@@ -58,15 +58,16 @@ func getItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	}
 }
 
-// set single keys (value goes in the body)
-func setItem(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	buf := &bytes.Buffer{}
-	if _, err := io.Copy(buf, r.Body); err != nil {
+// set single key (key/value msgpack struct in body)
+func setItem(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	kv := &keyval{}
+	err := codec.NewDecoder(r.Body, msgpack).Decode(kv)
+	if err != nil {
 		failErr(w, err)
 		return
 	}
 
-	err := db.Put([]byte(p.ByName("name")[1:]), buf.Bytes(), nil)
+	err = db.Put([]byte(kv.Key), []byte(kv.Value), nil)
 	if err != nil {
 		failErr(w, err)
 	} else {
