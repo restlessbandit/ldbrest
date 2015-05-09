@@ -1,8 +1,6 @@
 package libldbrest
 
 import (
-	"bytes"
-	"io"
 	"net/http"
 	"strconv"
 
