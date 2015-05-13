@@ -69,6 +69,9 @@ Applies a batch of updates atomically. It accepts a msgpack request body with
 key "ops", an array of objects with keys "op", "key", and "value". "op" may be
 "put" or "delete", in the latter case "value" may be omitted.
 
+It will refuse to process batches with more than 10,000 items with a 413
+("Request Entity Too Large").
+
   GET /property/<name>
 Gets and returns the leveldb property in the text/plain 200 response body, or
 404s if it isn't a valid property name.

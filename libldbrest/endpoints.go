@@ -178,6 +178,11 @@ func batchSetItems(w http.ResponseWriter, r *http.Request, p httprouter.Params) 
 		return
 	}
 
+	if len(req.Ops) > 10000 {
+		failCode(w, http.StatusRequestEntityTooLarge)
+		return
+	}
+
 	err = applyBatch(req.Ops)
 	if err == errBadBatch {
 		failCode(w, http.StatusBadRequest)
